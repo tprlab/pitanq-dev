@@ -35,22 +35,21 @@ def balance_pic(image):
     global T
     ret = None
     direction = 0
-    for i in range(0, 10):
+    for i in range(0, tconf.th_iterations):
         rc, gray = cv.threshold(image, T, 255, 0)
         crop = Roi.crop_roi(gray)
         nwh = cv.countNonZero(crop)
         perc = int(100 * nwh / Roi.get_area())
-        logging.debug(("balance attempt", i, T, perc))
-        if perc > 12:
-            if T > 199:
+        if perc > tconf.white_max:
+            if T > tconf.threshold_max:
                 break
             if direction == -1:
                 ret = crop
                 break
             T += 10
             direction = 1
-        elif perc < 4:
-            if T < 50:
+        elif perc < tconf.white_min:
+            if T < tconf.threshold_min:
                 break
             if  direction == 1:
                 ret = crop
@@ -102,25 +101,37 @@ Depending on these features the algo decides if the tank should go straight or t
             if a is None:
               # there is some code omitted related to line finding
               break
-            turn_state = 0
-            if a < 45 or a > 135:
-                turn_state = np.sign(90 - a)
-            shift_state = 0
-            if abs(shift) > 20:
-                shift_state = np.sign(shift)
-            turn_dir = 0
-            turn_val = 0
-            turn_K = 2.0
-            if shift_state != 0:
-                turn_dir = shift_state
-                turn_val = 1.0 if shift_state != turn_state else turn_K
-            elif turn_state != 0:
-                turn_dir = turn_state
-                turn_val = turn_K
+            turn_state, shift_state = check_shift_turn(a, shift)
+            turn_dir, turn_val = get_turn(turn_state, shift_state)
             if turn_dir != 0:
-                turn(turn_dir, 0.125 * turn_val)
+                turn(turn_dir, turn_val)
+                last_turn = turn_dir
             else:
-                time.sleep(0.5)
+                time.sleep(tconf.straight_run)
+                last_turn = 0
+
+```
+Where the procedures code is:
+```
+def check_shift_turn(angle, shift):
+    turn_state = 0
+    if angle < tconf.turn_angle or angle > 180 - tconf.turn_angle:
+        turn_state = np.sign(90 - angle)
+    shift_state = 0
+    if abs(shift) > tconf.shift_max:
+        shift_state = np.sign(shift)
+    return turn_state, shift_state
+
+def get_turn(turn_state, shift_state):
+    turn_dir = 0
+    turn_val = 0
+    if shift_state != 0:
+        turn_dir = shift_state
+        turn_val = tconf.shift_step if shift_state != turn_state else tconf.turn_step
+    elif turn_state != 0:
+        turn_dir = turn_state
+        turn_val = tconf.turn_step
+    return turn_dir, turn_val                
 ```
 
 ## Algorithm settings
