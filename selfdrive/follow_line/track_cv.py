@@ -6,11 +6,12 @@ import os
 import logging
 import geom_util as geom
 import roi
+import track_conf as tconf
 
     
 
 #default gray threshold
-T = 120
+T = tconf.threshold
 Roi = roi.ROI()
 
 
@@ -19,7 +20,7 @@ def balance_pic(image):
     global T
     ret = None
     direction = 0
-    for i in range(0, 10):
+    for i in range(0, tconf.th_iterations):
 
         rc, gray = cv.threshold(image, T, 255, 0)
         crop = Roi.crop_roi(gray)
@@ -27,16 +28,16 @@ def balance_pic(image):
         nwh = cv.countNonZero(crop)
         perc = int(100 * nwh / Roi.get_area())
         logging.debug(("balance attempt", i, T, perc))
-        if perc > 12:
-            if T > 199:
+        if perc > tconf.white_max:
+            if T > tconf.threshold_max:
                 break
             if direction == -1:
                 ret = crop
                 break
             T += 10
             direction = 1
-        elif perc < 4:
-            if T < 50:
+        elif perc < tconf.white_min:
+            if T < tconf.threshold_min:
                 break
             if  direction == 1:
                 ret = crop
@@ -133,3 +134,4 @@ if __name__ == '__main__':
     fname = "photos/" + pic + ".jpg"
     angle, shift = handle_pic(fname, fout="out.jpg", show=True)
     print "Angle", angle, "Shift", shift
+                                   

@@ -4,6 +4,7 @@ import time
 import numpy as np
 import traceback
 import math
+import track_conf as tconf
 import logging
 
 logging.basicConfig(filename="track.log",level=logging.DEBUG)
@@ -15,8 +16,8 @@ def find_line(side):
     if side == 0:
         return None, None
         
-    for i in xrange(0, 5):
-        turn(side, 0.2)
+    for i in xrange(0, tconf.find_turn_attempts):
+        turn(side, tconf.find_turn_step)
         angle, shift = get_vector()
         if angle is not None:
             return angle, shift
@@ -51,6 +52,27 @@ def turn(r, t):
     time.sleep(t)
     tanq.set_motors(ret_cmd)
 
+def check_shift_turn(angle, shift):
+    turn_state = 0
+    if angle < tconf.turn_angle or angle > 180 - tconf.turn_angle:
+        turn_state = np.sign(90 - angle)
+
+    shift_state = 0
+    if abs(shift) > tconf.shift_max:
+        shift_state = np.sign(shift)
+    return turn_state, shift_state
+
+def get_turn(turn_state, shift_state):
+    turn_dir = 0
+    turn_val = 0
+    if shift_state != 0:
+        turn_dir = shift_state
+        turn_val = tconf.shift_step if shift_state != turn_state else tconf.turn_step
+    elif turn_state != 0:
+        turn_dir = turn_state
+        turn_val = tconf.turn_step
+    return turn_dir, turn_val                
+
 
 def follow(iterations):
     tanq.set_motors("ff")   
@@ -68,39 +90,22 @@ def follow(iterations):
                         break
                 elif last_angle != 0:
                     logging.debug(("Looking for line by angle", last_angle))
-                    turn(np.sign(90 - last_angle), 0.25)
+                    turn(np.sign(90 - last_angle), tconf.turn_step)
                     continue
                 else:
                     break
 
             logging.debug((i, "Angle", a, "Shift", shift))
 
-            turn_state = 0
-            if a < 45 or a > 135:
-                turn_state = np.sign(90 - a)
+            turn_state, shift_state = check_shift_turn(a, shift)
 
-            shift_state = 0
-            if abs(shift) > 20:
-                shift_state = np.sign(shift)
-
-            turn_dir = 0
-            turn_val = 0
-
-            turn_K = 2.0
-
-            if shift_state != 0:
-                turn_dir = shift_state
-                turn_val = 1.0 if shift_state != turn_state else turn_K
-            elif turn_state != 0:
-                turn_dir = turn_state
-                turn_val = turn_K
-                
+            turn_dir, turn_val = get_turn(turn_state, shift_state)
 
             if turn_dir != 0:
-                turn(turn_dir, 0.125 * turn_val)
+                turn(turn_dir, turn_val)
                 last_turn = turn_dir
             else:
-                time.sleep(0.5)
+                time.sleep(tconf.straight_run)
                 last_turn = 0
             last_angle = a
         
@@ -109,5 +114,5 @@ def follow(iterations):
 
 
 
-#time.sleep(5)
-follow(10)
+if __name__ == '__main__':
+    follow(tconf.max_steps)
