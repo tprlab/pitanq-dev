@@ -44,4 +44,5 @@ find_turn_step = 0.2
 # max # of iterations of the whole tracking
 max_steps = 40
 
-
+# target brightness level
+brightness = 100

@@ -51,6 +51,18 @@ def balance_pic(image):
     return ret      
 
 
+def adjust_brightness(img, level):
+    hsv = cv.cvtColor(img, cv.COLOR_BGR2HSV)
+    b = np.mean(img[:,:,2])
+    if b == 0:
+        return img
+    r = level / b
+    c = img.copy()
+    c[:,:,2] = c[:,:,2] * r
+    return cv.cvtColor(c, cv.COLOR_HSV2BGR)
+
+    
+
 def prepare_pic(image):
     global Roi
     global T
@@ -124,6 +136,66 @@ def handle_pic(path, fout = None, show = False):
         cv.waitKey(0)
     return angle, shift
 
+def prepare_pic2(image):
+    height, width = image.shape[:2]
+    crop = image[3 * height / 4: height, width / 4:3 * width/ 4]
+    crop = adjust_brightness(crop, tconf.brightness)
+
+    gray = cv.cvtColor(crop, cv.COLOR_BGR2GRAY)
+    blurred = cv.GaussianBlur(gray, (9, 9), 0)
+
+    rc, gray = cv.threshold(blurred, tconf.threshold, 255, 0)
+    return gray, width / 2, height / 4
+
+
+
+def handle_pic2(path, fout = None, show = False):
+    image = cv.imread(path)
+    if image is None:
+        logging.warning(("File not found", path))
+        return None, None
+    height, width = image.shape[:2]
+    cropped, w, h = prepare_pic2(image)
+    if cropped is None:
+        return None, None
+    cont, box = find_main_countour(cropped)
+    if cont is None:
+        return None, None
+    
+    p1, p2 = geom.calc_box_vector(box)
+    if p1 is None:
+        return None, None
+
+    angle = geom.get_vert_angle(p1, p2, w, h)
+    shift = geom.get_horz_shift(p1[0], w)
+
+    draw = fout is not None or show
+
+    if draw:
+        w_offset = (width - w) / 2
+        h_offset = (height - h)
+        dbox = geom.shift_box(box, w_offset, h_offset)
+
+        cv.drawContours(image,[dbox],0,(255,0,0),2)
+        dp1 = (p1[0] + w_offset, p1[1] + h_offset)
+        dp2 = (p2[0] + w_offset, p2[1] + h_offset)
+        cv.line(image, dp1, dp2, (0, 255, 0), 3)
+        msg_a = "Angle {0}".format(int(angle))
+        msg_s = "Shift {0}".format(int(shift))
+
+        cv.putText(image, msg_a, (10, 20), cv.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
+        cv.putText(image, msg_s, (10, 40), cv.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
+
+    if fout is not None:
+        cv.imwrite(fout, image)
+
+    if show:    
+        cv.imshow("Image", image)
+        cv.waitKey(0)
+    return angle, shift
+
+
+
 
 if __name__ == '__main__':
     logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
@@ -131,7 +203,11 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         pic = sys.argv[1]
 
+    """
     fname = "photos/" + pic + ".jpg"
-    angle, shift = handle_pic(fname, fout="out.jpg", show=True)
+    angle, shift = handle_pic2(fname, fout="out.jpg", show=True)
     print "Angle", angle, "Shift", shift
+    """
+    for f in os.listdir("test"):
+        a, s = handle_pic("test/" + f, show=True)
                                    

@@ -63,6 +63,10 @@ def order_box(box):
 
     return np.array([top_l, top_r, btm_r, btm_l])
 
+def shift_box(box, w, h):
+    return np.array([[box[0][0] + w,box[0][1] + h],[box[1][0] + w,box[1][1] + h], [box[2][0] + w,box[2][1] + h],[box[3][0] + w,box[3][1] + h]])
+
+
 def calc_box_vector(box):
     v_side = calc_line_length(box[0], box[3])
     h_side = calc_line_length(box[0], box[1])
